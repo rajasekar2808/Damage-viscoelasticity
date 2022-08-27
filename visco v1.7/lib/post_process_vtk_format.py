@@ -22,7 +22,7 @@ class store_data_as_vtk:
         self._offset = np.array(range(3,len(self._conn)+1,3))
         
 
-    def save_vtk(self,path, point_data=None, cell_data=None):
+    def save_vtk(self,path, point_data=None, cell_data=None, field_data =None):
         ## give a dict of point data (nodes) and cell data (elements)
         ## eg: cell_data= {'damage':d}
         
@@ -35,7 +35,7 @@ class store_data_as_vtk:
                                 offsets= self._offset,
                                 cell_types= self._ctype,
                                 pointData= point_data,
-                                cellData = cell_data)
+                                cellData = cell_data, fieldData=field_data)
         
         except:
             ## to make the arrays provied contigous else doesnt work in pyevtk library
@@ -57,7 +57,7 @@ class store_data_as_vtk:
                                 offsets= self._offset,
                                 cell_types= self._ctype,
                                 pointData= new_point_data,
-                                cellData = new_cell_data)
+                                cellData = new_cell_data, fieldData=field_data)
             
     def group_vtk(self,source,dest,indices):
         ## to group filenames in a lsit given by 'source' and store it under the filename 'dest'

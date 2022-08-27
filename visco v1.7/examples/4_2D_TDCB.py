@@ -18,8 +18,8 @@ import sys
 sys.path.append('../lib')
 #sys.path.append('./.')
 
-import viscoelasticity_law2D as visclaw
-import viscoelasticymech2d   as mech2d
+import viscoelasticity_law2D1 as visclaw
+import viscoelasticymech2d1   as mech2d
 from mesh import simplexMesh, dualLipMeshTriangle
 import liplog
 import logging
@@ -61,7 +61,7 @@ thickness = 1; b= thickness;  ## thickness in z-direction
 
 ### name for outputfiles 
 
-simulation_id = str(1)     ## give new id for performing simulation on same mesh with different setting (to save in a different folder)
+simulation_id = str(355133131)     ## give new id for performing simulation on same mesh with different setting (to save in a different folder)
 expname = basemeshname+ simulation_id
 
 ### for outputfiles 
@@ -94,13 +94,13 @@ resume_disp = None  ## provide previously applied displacement
 
 
 ## example to resume simulation
-"""
 
+"""
 resume_simulation = True
 
-resume_path = r'D:/VBox shared folder/visco v1.6 - Copie (2)/tmp/new_scb_15/results/results_u_0.00029500000000000045_.npz'
-resume_path2 = r'D:/VBox shared folder/visco v1.6 - Copie (2)/tmp/new_scb_15/force_disp.npz'
-resume_disp = 0.00029500000000000045   ## can extract from the file name of resume_path
+resume_path = r'D:\VBox shared folder\visco v1.7\tmp\tdcb35\results\results_u_5.0000000000000375e-05_.npz'
+resume_path2 = r'D:\VBox shared folder\visco v1.7\tmp\tdcb35\force_disp.npz'
+resume_disp = 5.0000000000000375e-05   ## can extract from the file name of resume_path
 """
 
 if resume_simulation:
@@ -148,17 +148,17 @@ stop_force = 50           ## N
 ## Material parameters
 
 
-"""
+
 E = [31770, 87398, 123414, 65830, 62457, 62661, 7305, 12500, 418, 1743, 79, 39]    ## MPa
 E = [i*1e6 for i in E]     ## Pa
 tau = [1e-5, 1e-4, 1e-3, 5e-3, 1e-2, 1e-1, 1, 1e1, 1e2, 5e2, 1e3]   ## s
-Yc = 23000    ## J/m^3
+Yc = 2300    ## J/m^3
 ni = 11+1     ## number of variables (excluding damage variable)  (or) number of units in GKV 
 
-
+"""
 E = E[3:5]
 tau = [tau[4]]
-"""
+
 
 ni = 1+1
 E0=2674e6
@@ -167,14 +167,17 @@ E1=97e6
 tau = 29
 E = [E0,E1]
 tau =[tau]
-
+"""
 if len(tau)+1 != len(E) or len(E)!=ni:
     raise
     
 nu = 0.2    ## constant Poisson's ratio for all units
-Yc = 30     ##(N/m^2)
-lc = 5e-3       ## m
-eta = 0.1    ## for degradation function 
+#Yc = 30     ##(N/m^2)
+l_LF = 5e-3       ## m
+l_PF = .5*l_LF
+#eta = 0.1    ## for degradation function 
+
+Gc = (4/3)*Yc*l_LF
 
  ## Time Temperature Superpossition TTS (using Williams-Landels-Ferry (WLF) Law )
 T_ref = 20
@@ -200,7 +203,7 @@ for i in range(ni):
 lamb = tuple(lamb)
 mu = tuple(mu)
 
-damage_calc = True   ## set to true for performing damage calc.
+damage_calc = 1   ## set to true for performing damage calc.
 
 
 ## Load constitutive laws
@@ -218,9 +221,10 @@ split_choice = None
 
 if not unilateral:
     #### law 1: symmetric tension/compression  cons. law
-    g = visclaw.GQuadratic()   ## degradation function g(d)
-    H = visclaw.HQuadratic()   ## softening function   h(d)
-    law = visclaw.viscoElasticity2dPlaneStrain(ni,lamb,mu,tau,g1=g,g2=g,Yc=Yc,h=H, var_con=False)
+    g1 = visclaw.GQuadratic()   ## degradation function g(d)
+    g2 = visclaw.G_Const_1()
+    H = visclaw.HQuadratic2()   ## softening function   h(d)
+    law = visclaw.viscoElasticity2dPlaneStrain(ni,lamb,mu,tau,g1=g1,g2=g2,Yc=Yc,h=H,Gc=Gc,var_con=0)
 else:
     ### law 2: aymmetric tension/compression cons. law    
     if split_choice is None: split_choice = 2      ## determines the type of split for free energy ( psi^+ and psi^-)
@@ -275,7 +279,12 @@ logger.info('LipMesh size : nv: '+ str(lipmesh.nvertices)+' nf: '+ str(lipmesh.n
 #############################################################################
 
 damage_solver = 'LF'     ### = 'LF' for Lip-Field solver
-#damage_solver = 'PF'     ### = 'PF' for Phase-field AT2 solver
+damage_solver = 'PF'     ### = 'PF' for Phase-field AT2 solver
+
+if damage_solver == 'LF':
+    lc = l_LF
+else:
+    lc = l_PF
 
 ## create an instance of the mechanical class for viscoelasticity
 mech = mech2d.Mechanics2D(mesh, law, lipproj,logger=logger,lc = lc,potential=damage_solver)  
@@ -286,7 +295,7 @@ solverdisp = None; solverdispoptions = None;
 if not unilateral:
     ## load linear solver for displacements
      solverdisp = mech2d.Mechanics2D.solveDisplacementFixedDLinear
-     solverdispoptions = {'linsolve':'cholmod'}
+     solverdispoptions = {'linsolve':'umfpack'}
 else:
     ## load non linear solver (works on Newton method with line search)
     solverdisp = mech2d.Mechanics2D.solve_u_eps_i_nonlinear
@@ -312,7 +321,7 @@ if damage_calc:
 
 ### Alternate Minimisation solver options (Staggered solver )
 alternedsolver = mech.alternedSolver
-alternedsolveroptions= {'abstole':1.e-8, 'reltole':1.e-3, 'deltadtol':1.e-2, 'max_iter': 20}
+alternedsolveroptions= {'abstole':1.e-9, 'reltole':1.e-9, 'deltadtol':1.e-5, 'max_iter': 100}
 
 
 
@@ -357,7 +366,7 @@ time_step = [.05,.5 ,.001, .01, .05]
 
 speed = .1/1000   ## m/s
 max_uy = 4/1000   ## maximum allowed displacement for the simulation 
-DT = 1e-3     ##  time step (s) 
+DT = 1e-3    ##  time step (s) 
 adap_time_step = False
 
 
@@ -455,6 +464,11 @@ if resume_path is None:
     energ = {'fe':[0], 'vd': [0], 'de':[0], 'wi':[0], 'cl':[0]}    ## J
 else:
     R = np.zeros((nv,2))
+    
+if damage_solver == 'PF':
+    d_nodal = np.zeros(mesh.nvertices)   
+else:
+    d_nodal = None
 time = 0
 count = 0
  
@@ -462,6 +476,8 @@ timeu.append(0); timed.append(0);
 
 
 
+
+timer = liplog.timer() 
 
 
 
@@ -473,7 +489,9 @@ while u_appl < max_uy:
     setloading(u_appl)
     dmin = d.copy()
     pr.enable()
-    res= alternedsolver( dmin =dmin, dguess =d.copy(), DT=DT1, un= u.copy(), eps_i_n = eps_i.copy(),  
+    timer.new_increment()
+    timer.start('total') 
+    res= alternedsolver( dmin =dmin, dguess =d.copy(), DT=DT1, un= u.copy(), eps_i_n = eps_i.copy(),  d_nodes=d_nodal,
                 alternedsolveroptions = alternedsolveroptions,
                 solverdisp = solverdisp, solverdispoptions= solverdispoptions,
                 solverd= solverd, 
@@ -511,14 +529,19 @@ while u_appl < max_uy:
         d_nodal = res['d_nodal']
         alt_iter.append(res['iter'])  ## number of AM iterations
         stress = law.trialStress(mech.strain(u), eps_i,d)
-        timeu[-1] += res['timeu']
-        timed[-1] += res['timed']
+        timer.end('total')
+        timer.log(logger)
+
+        timeu.append(res['timeu'])
+        timed.append(res['timed'])
+        logger.info('time on displacement solver :  ' + str(timeu[-1]))
+        logger.info('time on damage solver :  ' + str(timed[-1]))
         
         if onlineplot :     
             if np.max(d) > 0 and count%4==0:
                 mech.plots(u, d,eps_i, u_appl, respath2+'/'+expname, showmesh = showmesh,DT=DT1,eps_i_n=eps_i_n)
         
-        file1 =respath2+'/'+'results_u_'+str(u_appl)+'_.npz'
+        file1 =respath2+'/'+'results_u_'+str(u_appl)+'_ind_'+str(count)+'.npz'
         logger.info("Saving output to file")
         np.savez(file1,u=np.array(u).squeeze(),d=np.array(d).squeeze(),DT = np.array([DT1]),
                      eps_i = np.array(eps_i).squeeze(),R = res['R'], stress = stress)
@@ -528,9 +551,9 @@ while u_appl < max_uy:
         Fy.append(calc_reaction_force(R)[1]*thickness)
         ene = mech.energies(u, eps_i, eps_i_n,d,DT1,d_nodal)
         energ['fe'].append(ene['fe'] *thickness)
-        energ['vd'].append(energ['vd'][-1]+ ene['vd'] *thickness)
+        energ['vd'].append( ene['vd'] *thickness)
         energ['de'].append(ene['de'] *thickness)
-        energ['wi'].append(energ['wi'][-1]+ Fy[-1]*speed*(DT1))
+        energ['wi'].append( Fy[-1]*speed*(DT1))
         energ['cl'].append(mech.crack_length(d,d_nodal))
         if real_time_plot:
             axes.set_xlim(-1e-4, max(uimp))
@@ -542,9 +565,9 @@ while u_appl < max_uy:
         
         ## save force-displacement and nb. of AM iterations and update it at each time step
         np.savez(respath1+'/force_disp.npz',Fx = np.array(Fx).squeeze(), Fy = np.array(Fy).squeeze(),
-                 u = np.array(uimp).squeeze(), alt_iter = np.array(alt_iter).squeeze(), 
+                 u = np.array(uimp).squeeze(), alt_iter = np.array(alt_iter).squeeze(), timeu = np.array(timeu), timed = np.array(timed), 
                  fe = np.array(energ['fe']), vd = np.array(energ['vd']),de = np.array(energ['de']),
-                 wi = np.array(energ['wi']),cl = np.array(energ['cl']))
+                 wi = np.array(energ['wi']),cl = np.array(energ['cl']),)
         
         
         count+=1

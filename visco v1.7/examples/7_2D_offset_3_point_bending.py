@@ -58,11 +58,13 @@ h = 100/1000 ;
 
 
 
+
+
 ##############################################################################
 ##########################  FOR WRITING RESULTS TO FILE ######################
 ##############################################################################
 
-simulation_id = str(21)     ## give new id for performing simulation on same mesh with different setting (to save in a different folder)
+simulation_id = str(1123112312311)     ## give new id for performing simulation on same mesh with different setting (to save in a different folder)
 expname = basemeshname+ simulation_id
 
 ### for outputfiles 
@@ -159,31 +161,31 @@ E = E[3:5]
 tau = [tau[4]]
 """
 
-ni = 6+1
+ni = 3+1
 
-E = [4.64389115e+10, 1.00000000e+13, 7.21400341e+11, 8.73919247e+11,
-       2.04738342e+11, 3.42961951e+11, 1.45459818e+11]
+E = [2300e6, 1500e6, 800e6, 100e6]
 
 
-tau = [1.00000000e-01,2.41189097e+00, 1.91775628e-01, 2.56432559e+02,
-       2.80767879e+01, 6.00000000e+03]
+tau = [.05,15,26]
 
 if len(tau)+1 != len(E) or len(E)!=ni:
     raise
 
+Yc = .014e6
+  
+nu = 0.2    ## constant Poisson's ratio for all units
+#Yc = 30     ##(N/m^2)
+l_LF = 10e-3       ## m
+l_PF = .5*l_LF
+#eta = 0.1    ## for degradation function 
 
-G_c = 344 ##J/m^2
+Gc = (4/3)*Yc*l_LF
+
+lmin = 1.4e-3   ## minimum mesh size
+
+Gc = Gc/(1+lmin/(4*l_PF))
 
 
-l_pf = 10e-3
-
-lc = 2*l_pf  ## characterstic/regularization length (m)  
-
-## Yc = G_c/4./lc    ## critical energy release rate (J/m^3)  (for h(d) = 2d+3d^2)
-
-Yc = 3*G_c/(4*lc)    ## local equilent damage evoltion as fo PF AT2     ## for h(d) = 2d^2
-
-nu=0.2  ## Poisson's ratio
 
 ##plane strain assumption
 ## find the material constants lamb and mu for each spring in GKV
@@ -212,20 +214,19 @@ unilateral = True   ## bool for asymmetric tension/compression effects
 split_choice = 2    
 
 if not unilateral:
-    #### law 1: symmetric tension/compression  cons. law  (for the moment works only with g1 = g2)
+    #### law 1: symmetric tension/compression  cons. law
     g1 = visclaw.GQuadratic()   ## degradation function g(d)
-    g2 = visclaw.GQuadratic()   
-    H = visclaw.HQuadratic()   ## softening function   h(d)
-    law = visclaw.viscoElasticity2dPlaneStrain(ni,lamb,mu,tau,g1=g1,g2=g2,Yc=Yc,h=H,Gc = G_c)
+    g2 = visclaw.G_Const_1()
+    H = visclaw.HQuadratic2()   ## softening function   h(d)
+    law = visclaw.viscoElasticity2dPlaneStrain(ni,lamb,mu,tau,g1=g1,g2=g2,Yc=Yc,h=H,Gc=Gc,var_con=0)
 else:
-    ### law 2: aymmetric tension/compression cons. law 
-    
+    ### law 2: aymmetric tension/compression cons. law    
     if split_choice is None: split_choice = 2      ## determines the type of split for free energy ( psi^+ and psi^-)
     g1 = visclaw.GQuadratic()    ## g1(d)
-    g2 = visclaw.G_Const_1()     ## g2(d) = 1  (helps in numerical stability)
+    g2 = visclaw.G_Const_1()     ## g2(d) = 1  helps in numerical stability
     H = visclaw.HQuadratic2()     ## h(d)
     law = visclaw.viscoElasticity2dPlaneStrain_ASSIM(ni,lamb,mu,tau,split_choice=split_choice,Yc = Yc,
-                                                     g1 =g1,g2=g2,h=H,Gc = G_c)
+                                                     g1 =g1,g2=g2,h=H, Gc=Gc)
 
 
 
@@ -269,12 +270,16 @@ logger.info('LipMesh size : nv: '+ str(lipmesh.nvertices)+' nf: '+ str(lipmesh.n
 ###################  INITIATE THE SOLVERS #####################################
 #############################################################################
 
-damage_solver = 'PF'     ### = 'LF' for Lip-Field solver
-#damage_solver = 'PF'     ### = 'PF' for Phase-field AT2 solver
+damage_solver = 'LF'     ### = 'LF' for Lip-Field solver
+damage_solver = 'PF'     ### = 'PF' for Phase-field AT2 solver
 
+if damage_solver == 'LF':
+    lc = l_LF
+else:
+    lc = l_PF
 
 ## create an instance of the mechanical class for viscoelasticity
-mech = mech2d.Mechanics2D(mesh, law, lipproj,logger=logger,lc = lc)  
+mech = mech2d.Mechanics2D(mesh, law, lipproj,logger=logger,lc = lc,potential=damage_solver)  
 
 
 ### DISPLACEMENT (AND INTERNAL STRAINS) SOLVER
@@ -301,8 +306,8 @@ if damage_calc:
         solverdoptions ={'mindeltad':1.e-3, 'fixpatchbound':False, 
                             'Patchsolver':'triangle', 'FMSolver':'triangle', 
                             'parallelpatch':False, 'snapthreshold':0.999,
-                            #'kktsolveroptions': {'mode':'schur', 'linsolve':'cholmod'}
-                            'kktsolveroptions': {'mode':'direct', 'linsolve':'umfpack'}
+                            'kktsolveroptions': {'mode':'schur', 'linsolve':'cholmod'}
+                            #'kktsolveroptions': {'mode':'direct', 'linsolve':'umfpack'}
                             }
 
 
@@ -338,12 +343,12 @@ vidl2 = mesh.getVerticesOnClassifiedEdges(idl2)
 
 
 
-velocity = [i/1000 for i in [5e-3,10e-3]]        ## m/s
-time_step = [5e-2,.5e-2] 
+velocity = [i/1000 for i in [.1,1]]        ## m/s
+time_step = [1e-2,1e-2] 
 ## threshold for the applied displacement and forces after which the simulation is stopped 
 ## (give maximum values if not sure allowing the solver to run until stiffness matrix becomes singular enough!) 
 max_displacement_y = [i/1000 for i in [200,200,200]]    ## m    
-stop_forces = [100,100]                                  #  N
+stop_forces = [5,5]                                  #  N
 
 
 ## Choose the ind b/w 0 and 2 to select the velocity and time step
@@ -396,7 +401,7 @@ with open(opti_file,'a') as fl:
 ## (to prevent damage close to supports or to save computation time if crack path is known in advance )
 
 videl_d0  =None
-
+"""
 videl_d0 = []
 a_low = -np.inf/1000     ;   a_left = 94/1000
 a_uppe = np.inf/1000     ;   a_right = 180/1000
@@ -412,7 +417,30 @@ for ele_num,ele in enumerate(mesh.triangles):
             videl_d0.append(ele_num)
             break
 
+"""
 
+videl_d0 =set()
+dist_r = .008   ## for elements within a distance r from boundaries damage is enforced 0
+
+bound_cntrs = []
+for bound_vert in [vidl0,vidl1,vidl2]:
+        bound_cntrs.append(np.mean(mesh.xy[bound_vert], axis =0))
+
+
+distance = lambda a1,a2: np.sqrt((a1[0]-a2[0])**2 + (a1[1]-a2[1])**2 ) 
+
+for nde_num in range(mesh.nvertices):
+    
+        a1 = mesh.xy[nde_num]
+        dist = np.inf
+        for cntrs in bound_cntrs:
+            a2 = cntrs
+            dist = min(dist,distance(a1, a2))
+        if dist <= dist_r:
+            videl_d0.update(mesh.getVertex2Triangles(nde_num))
+            
+videl_d0 = list(videl_d0)      
+    
 
 
 
@@ -517,6 +545,8 @@ timeu.append(0); timed.append(0);
 
 
 
+timer = liplog.timer() 
+
 
 ## adaptive time stepping variable
 DT1 = DT; 
@@ -528,6 +558,8 @@ while u_appl < max_uy:
         imposed_displacement[2*int(vid) + 1] =   -u_appl
     dmin = d.copy()
     pr.enable()
+    timer.new_increment()
+    timer.start('total') 
     res= alternedsolver( dmin =dmin, dguess =d.copy(), DT=DT1, un= u.copy(), eps_i_n = eps_i.copy(), 
                 imposed_displacement = imposed_displacement, 
                 alternedsolveroptions = alternedsolveroptions,
@@ -567,8 +599,11 @@ while u_appl < max_uy:
         d_nodal = res['d_nodal']
         alt_iter.append(res['iter'])  ## number of AM iterations
         stress = law.trialStress(mech.strain(u), eps_i,d)
-        timeu[-1] += res['timeu']
-        timed[-1] += res['timed']
+        timer.end('total')
+        timer.log(logger)
+        
+        timeu.append(res['timeu'])
+        timed.append(res['timed'])
         
         if onlineplot :     
             if np.max(d) > 0 and count%4==0:
@@ -598,7 +633,7 @@ while u_appl < max_uy:
         
         ## save force-displacement and nb. of AM iterations and update it at each time step
         np.savez(respath1+'/force_disp.npz',Fx = np.array(Fx).squeeze(), Fy = np.array(Fy).squeeze(),
-                 u = np.array(uimp).squeeze(), alt_iter = np.array(alt_iter).squeeze(), 
+                 u = np.array(uimp).squeeze(), alt_iter = np.array(alt_iter).squeeze(),  timeu = np.array(timeu), timed = np.array(timed), 
                  fe = np.array(energ['fe']), vd = np.array(energ['vd']),de = np.array(energ['de']),
                  wi = np.array(energ['wi']),cl = np.array(energ['cl']))
         

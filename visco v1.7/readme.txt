@@ -2,7 +2,7 @@ Simulation of damage softening in viscoelasticity (GKV model) using Lip-field an
 
 - Example scripts to run the code can be found in examples folder
 - Constitutive law file, mechanical file, mesh file, lip and phase damage files in the lib folder
-- tools folder contain files for post process (to open the results in paraview) and files for least square fitting of GKV parameters from Dynamics modulous (or Prony series parameters)
+- tools folder contain files for post process (to open the results in paraview  [ https://www.paraview.org/ ] ) and files for least square fitting of GKV parameters from Dynamics modulous (or Prony series parameters)
 - meshes used for the simulations could be found in the mesh folder. Mesh generated using GMsh (https://gmsh.info/)
 - tmp folder to store the output results 
 - All examples are run for SI units 

@@ -18,8 +18,8 @@ import sys
 sys.path.append('../lib')
 #sys.path.append('./.')
 
-import viscoelasticity_law2D as visclaw
-import viscoelasticymech2d   as mech2d
+import viscoelasticity_law2D1 as visclaw
+import viscoelasticymech2d1   as mech2d
 from mesh import simplexMesh, dualLipMeshTriangle
 import liplog
 import logging
@@ -59,7 +59,7 @@ h = 1
 
 ### name for outputfiles 
 
-simulation_id = str(11221)     ## give new id for performing simulation on same mesh with different setting
+simulation_id = str(21)     ## give new id for performing simulation on same mesh with different setting
 expname = basemeshname+ simulation_id
 
 ### for outputfiles 
@@ -117,7 +117,7 @@ ni = 2+1
 if len(tau)+1 != ni or len(E)!=ni:
     raise
 
-nu=0  ## Poisson's ratio
+nu=0.0  ## Poisson's ratio
 
 ##plane strain assumption
 ## find the material constants lamb and mu for each spring in GKV
@@ -135,7 +135,7 @@ damage_calc = False   ## set to true for performing damage calc.
 
 ## Load constitutive laws
 
-unilateral = False   ## bool for asymmetric tension/compression effects
+unilateral = 0  ## bool for asymmetric tension/compression effects
 split_choice = None
 
 if not unilateral:
@@ -327,8 +327,8 @@ def bar_analytical_sol(U_dot,max_u_appl,dt=1e-1):
 ## time iteration 
 
 velocity = [8e-3, .1e-1, .5]           ## m/s
-max_displacement_y = [.001,.05,.5]      ## max_displacement applied for each speed
-time_step = [.001,.05,.1] 
+max_displacement_y = [.05,.05,.05]      ## max_displacement applied for each speed
+time_step = [.01,.01,.01] 
 tot_time = []     ## total time when the max_displacement  is attained
 
 
@@ -356,7 +356,7 @@ Fx_ana = []
 plt.close('all')
 onlineplot = True      ## for saving contour plots to pdf
 real_time_plot = True  ## for plotting  real time force-disp curves as the program runs
-showmesh = (nv < 1000)
+showmesh = False
 
 if showmesh:
     mesh.plot()
@@ -387,6 +387,10 @@ d = np.zeros(nf)
 
 ## plot for damage
 #figd, axd = plt.subplots() 
+
+
+energ = {'fe':[0], 'vd': [0], 'de':[0], 'wi':[0]}    ## enrgy in 'J' and cl in 'm'
+
 
 ##time increment 
 
@@ -430,12 +434,17 @@ for ind, (speed, max_uy, DT) in enumerate(zip(velocity, max_displacement_y, time
         logger.info('\n End uimpminimize = '+ str(u_appl) + ' Conv :' + str(res['iter']) + ' iter, |dmin-d1|= ' + '%2.e'%dmind1+'\n\n')
         pr.disable()
         u = res['u']
+        eps_i_n = eps_i.copy()
         eps_i = res['eps_i']
         d = res['d']
         R = res['R']
         timeu[-1] += res['timeu']
         timed[-1] += res['timed']
         alt_iter_tmp.append(res['iter'])
+        
+        
+        
+        
         
         if onlineplot :     
             if np.max(d) > 0 :
@@ -446,6 +455,11 @@ for ind, (speed, max_uy, DT) in enumerate(zip(velocity, max_displacement_y, time
         ##updating local displacement curve
         temp_disp.append(u_appl/L)   ##strain_x
         temp_force.append(calc_reaction_force2(R)[0]) ##stress_x
+        ene = mech.energies(u, eps_i, eps_i_n,d,DT)
+        energ['fe'].append(ene['fe'] *thickness)
+        energ['vd'].append(energ['vd'][-1]+ ene['vd'] *thickness)
+        energ['de'].append(ene['de'] *thickness)
+        energ['wi'].append(energ['wi'][-1]+ temp_force[-1]*speed*(DT))
         if real_time_plot:
             max_data_plot = max(max_data_plot, temp_force[-1])
             axes.set_ylim(-.2, 1.1*max_data_plot)
