@@ -94,8 +94,8 @@ class phase_damage_AT2:
                 Be =  np.linalg.inv(xy).dot( np.array([[-1,1.,0.],[-1.,0.,1.]]))
                 gradop[2*it, t] = Be[0,:]
                 gradop[2*it+1, t] = Be[1,:]
-            if gradop.count_nonzero() != 6*nf:
-                print(gradop.count_nonzero(), 6*nf)
+            #if gradop.count_nonzero() != 6*nf:
+                #print(gradop.count_nonzero(), 6*nf)
             self._gradOp = gradop.tocsr()
         return self._gradOp
 

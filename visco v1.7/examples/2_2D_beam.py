@@ -20,8 +20,8 @@ import sys
 sys.path.append('../lib')
 #sys.path.append('./.')
 
-import viscoelasticity_law2D as visclaw
-import viscoelasticymech2d   as mech2d
+import viscoelasticity_law2D1 as visclaw
+import viscoelasticymech2d1   as mech2d
 from mesh import simplexMesh, dualLipMeshTriangle
 import liplog
 import logging
@@ -135,7 +135,7 @@ damage_calc = False   ## set to true for performing damage calc.
 
 ## Load constitutive laws
 
-unilateral = False  ## bool for asymmetric tension/compression effects
+unilateral = 0  ## bool for asymmetric tension/compression effects
 split_choice = None
 
 if not unilateral:
@@ -203,7 +203,7 @@ if not unilateral:
 else:
     ## load non linear solver (works on Newton method with line search)
     solverdisp = mech2d.Mechanics2D.solve_u_eps_i_nonlinear
-    solverdispoptions = {'linsolve':'cholmod','itmax':30, 'resmax':1.e-5,'res_energy_abs':1e-5}
+    solverdispoptions = {'linsolve':'cholmod','itmax':10, 'resmax':1.e-5,'res_energy_abs':1e-5}
     ## resmax - relative total force  on the free nodes;; 
     ## res_energy_abs- difference of incremental potential b/w 2 consective Newton iterations
 
@@ -303,12 +303,12 @@ max_displacement_y = [i/1000 for i in [5,5,10]]      ## max_displacement applied
 time_step = [ .15, .1, .05] 
 tot_time = []     ## total time when the max_displacement  is attained
 
-"""
+
 vi = int(2)
 velocity = [velocity[vi]]
 max_displacement_y = [max_displacement_y[vi]]
 time_step = [time_step[vi]]
-"""
+
 
 w2f = ['\nvelocity : '+str(velocity), '\nTime step : '+ str(time_step)]
 with open(opti_file,'a') as fl:
@@ -393,6 +393,11 @@ alt_iter = []
 u = np.zeros((nv,2))
 d = np.zeros(nf)
 
+
+
+
+energ = {'fe':[0], 'vd': [0], 'de':[0], 'wi':[0]}    ## enrgy in 'J' and cl in 'm'
+
 ##time increment 
 
 for ind, (speed, max_uy, DT) in enumerate(zip(velocity, max_displacement_y, time_step)): 
@@ -435,6 +440,7 @@ for ind, (speed, max_uy, DT) in enumerate(zip(velocity, max_displacement_y, time
         logger.info('\n End uimpminimize = '+ str(u_appl) + ' Conv :' + str(res['iter']) + ' iter, |dmin-d1|= ' + '%2.e'%dmind1+'\n\n')
         pr.disable()
         u = res['u']
+        eps_i_n = eps_i.copy()
         eps_i = res['eps_i']
         d = res['d']
         R = res['R']
@@ -451,6 +457,13 @@ for ind, (speed, max_uy, DT) in enumerate(zip(velocity, max_displacement_y, time
         ##updating local displacement curve
         temp_disp.append(u_appl)   
         temp_force.append(calc_reaction_force(R)[1]*thickness) 
+        
+        ene = mech.energies(u, eps_i, eps_i_n,d,DT)
+        energ['fe'].append(ene['fe'] *thickness)
+        energ['vd'].append(energ['vd'][-1]+ ene['vd'] *thickness)
+        energ['de'].append(ene['de'] *thickness)
+        energ['wi'].append(energ['wi'][-1]+ temp_force[-1]*speed*(DT))
+        
         if real_time_plot:
             max_data_plot = max(max_data_plot, temp_force[-1])
             axes.set_ylim(-.2, 1.1*max_data_plot)

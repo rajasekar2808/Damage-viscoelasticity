@@ -1,7 +1,7 @@
 ######### Step 1:  Fill the path to pvd files
 ########  Step 2: Open paraview and go to file-load state and load this python script
 post_pr_file_name = 'output_post_proc.pvd'
-path_to_file = r'D:\VBox shared folder\results_lf_7\post_proc\output_post_proc.pvd'
+path_to_file = r'D:\VBox shared folder\results_liger\beam_offset_notch_3pb1_PF_v2\results\post_proc\output_post_proc.pvd'
 
 
 
